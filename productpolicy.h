@@ -18,13 +18,13 @@ struct ProductPolicyDataHeader {
 struct ProductPolicyValueHeader {
 	WORD totalsize = 0;
 	WORD namesize = 0;
-	WORD datatype = 0;
+	WORD datatype;
 	WORD datasize = 0;
 	DWORD flags = 0;
 	DWORD unknown = 0;
 };
 
-enum ProductPolicyValueType {
+enum ProductPolicyValueType : WORD {
 	PP_NONE = 0,
 	PP_SZ = 1,
 	PP_BINARY = 3,
@@ -35,7 +35,7 @@ enum ProductPolicyValueType {
 struct ProductPolicyValue {
 	ProductPolicyValueHeader header;
 	WCHAR* policyname;
-	ProductPolicyValueType valuetype;
+	BYTE* value;
 };
 
 struct ProductPolicyBlob {

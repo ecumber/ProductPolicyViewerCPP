@@ -4,6 +4,7 @@
 #include "framework.h"
 #include "ProductPolicyViewerCPP.h"
 #include "productpolicy.h"
+#include <stdio.h>
 
 #define MAX_LOADSTRING 100
 
@@ -20,6 +21,8 @@ LSTATUS OpenProductPolicyKey(LPBYTE output) {
 
 #define GetDWORDAtCurrentPos(pos) *reinterpret_cast<DWORD*>(pos)
 #define MovePointerForwardByDWORD(pos) pos = (pos + sizeof(DWORD))
+#define GetWORDAtCurrentPos(pos) *reinterpret_cast<WORD*>(pos)
+#define MovePointerForwardByWORD(pos) pos = (pos + sizeof(WORD))
 
 void ParseProductPolicyData(LPBYTE buffer) {
     if (!buffer)
@@ -42,7 +45,21 @@ void ParseProductPolicyData(LPBYTE buffer) {
     BYTE* valuepointer = buffer + 0x14;
 
     for (int i = 0; i < numvalues; i++) {
-        PPDataBlob->value[i].header = *valuepointer;
+        PPDataBlob->value[i].header.totalsize = GetWORDAtCurrentPos(valuepointer);
+        MovePointerForwardByWORD(valuepointer);
+        PPDataBlob->value[i].header.namesize = GetWORDAtCurrentPos(valuepointer);
+        MovePointerForwardByWORD(valuepointer);
+        PPDataBlob->value[i].header.datatype = GetWORDAtCurrentPos(valuepointer);
+        MovePointerForwardByWORD(valuepointer);
+        PPDataBlob->value[i].header.datasize = GetWORDAtCurrentPos(valuepointer);
+        MovePointerForwardByWORD(valuepointer);
+        PPDataBlob->value[i].header.flags = GetDWORDAtCurrentPos(valuepointer);
+        valuepointer = (valuepointer + (2 * sizeof(DWORD)));
+        PPDataBlob->value[i].policyname = (WCHAR*)malloc(PPDataBlob->value[i].header.namesize);
+        wcsncpy(PPDataBlob->value[i].policyname, reinterpret_cast<WCHAR*>(valuepointer), (size_t)(PPDataBlob->value[i].header.namesize / 2));
+        wprintf(PPDataBlob->value[i].policyname);
+        // move forward by length of name
+        //valuepointer = (valuepointer + PPDataBlob->value[i].header.namesize);
     }
     
     
