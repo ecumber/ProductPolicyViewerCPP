@@ -5,10 +5,13 @@
 #include "ProductPolicyViewerCPP.h"
 #include "productpolicy.h"
 #include <stdio.h>
+#include <commctrl.h>
+#include <strsafe.h>
 
 #define MAX_LOADSTRING 100
-
 static ProductPolicyBlob* PPDataBlob;
+static int numberofitems = 0;
+HWND listviewwnd;
 
 LSTATUS OpenProductPolicyKey(LPBYTE output) {
     HKEY PPKey = NULL;
@@ -24,9 +27,9 @@ LSTATUS OpenProductPolicyKey(LPBYTE output) {
 #define GetWORDAtCurrentPos(pos) *reinterpret_cast<WORD*>(pos)
 #define MovePointerForwardByWORD(pos) pos = (pos + sizeof(WORD))
 
-void ParseProductPolicyData(LPBYTE buffer) {
+int ParseProductPolicyData(LPBYTE buffer) {
     if (!buffer)
-        return;
+        return 0;
     BYTE* currentposition = buffer;
     PPDataBlob = new ProductPolicyBlob;
     PPDataBlob->dataheader = new ProductPolicyDataHeader;
@@ -35,18 +38,26 @@ void ParseProductPolicyData(LPBYTE buffer) {
     MovePointerForwardByDWORD(currentposition);
     
     // number of policies
-    PPDataBlob->dataheader->numberofvalues = GetDWORDAtCurrentPos(currentposition);
-    int numvalues = PPDataBlob->dataheader->numberofvalues;
+    PPDataBlob->dataheader->valuesize = GetDWORDAtCurrentPos(currentposition);
+    int valuesize = PPDataBlob->dataheader->valuesize;
 
-    PPDataBlob->value = new ProductPolicyValue[PPDataBlob->dataheader->numberofvalues];
+    PPDataBlob->value = new ProductPolicyValue[0x0923];
     MovePointerForwardByDWORD(currentposition);
     PPDataBlob->dataheader->endmarkersize = GetDWORDAtCurrentPos(currentposition);
 
     BYTE* valuepointer = buffer + 0x14;
 
-    for (int i = 0; i < numvalues; i++) {
+    int i = 0;
+    while (true) {
+        if (!valuepointer)
+            return 0;
         BYTE* oldvaluepointer = valuepointer;
         PPDataBlob->value[i].header.totalsize = GetWORDAtCurrentPos(valuepointer);
+        DWORD* end = reinterpret_cast<DWORD*>((valuepointer) + PPDataBlob->value[i].header.totalsize);
+        if (*end == 0x00000045) {
+            break;
+        }
+
         MovePointerForwardByWORD(valuepointer);
         PPDataBlob->value[i].header.namesize = GetWORDAtCurrentPos(valuepointer);
         MovePointerForwardByWORD(valuepointer);
@@ -76,8 +87,81 @@ void ParseProductPolicyData(LPBYTE buffer) {
                 break;
         }
         valuepointer = oldvaluepointer + PPDataBlob->value[i].header.totalsize;
+        i++;
+    }
+    return i;
+}
+
+
+extern "C" int InitProductPolicyColumns(HWND parentwnd, HINSTANCE hinstance, int numberofitems) {
+    INITCOMMONCONTROLSEX* CommonControlSex = new INITCOMMONCONTROLSEX;
+    CommonControlSex->dwICC = ICC_LISTVIEW_CLASSES;
+    InitCommonControlsEx(CommonControlSex);
+
+    RECT clientrect;
+    GetClientRect(parentwnd, &clientrect);
+
+
+    listviewwnd = CreateWindowEx(WS_EX_CLIENTEDGE, 
+        WC_LISTVIEW, 
+        L"Test", 
+        WS_CHILD | LVS_REPORT | LVS_EDITLABELS, 
+        0, 0, 
+        clientrect.right - clientrect.left, 
+        clientrect.bottom - clientrect.top,
+        parentwnd, 
+        (HMENU)1811, 
+        hinstance, NULL);
+    SetWindowText(listviewwnd, L"Leo");
+
+    LVITEM item;
+    item.pszText = LPSTR_TEXTCALLBACK; // Sends an LVN_GETDISPINFO message.
+    item.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_STATE;
+    item.stateMask = 0;
+    item.iSubItem = 0;
+    item.state = 0;
+    item.cchTextMax = 256;
+    LPWSTR text = (LPWSTR)malloc(sizeof("Policy"));
+    StringCchCopy(text, sizeof("Policy"), L"Policy");
+
+    LVCOLUMN column;
+    column.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
+    column.pszText = text;
+    column.cx = 256;
+
+    SendMessage(listviewwnd, LVM_INSERTCOLUMN, 0, (LPARAM)&column);
+
+    //type
+    StringCchCopy(text, sizeof("Type"), L"Type");
+    column.pszText = text;
+    SendMessage(listviewwnd, LVM_INSERTCOLUMN, 1, (LPARAM)&column);
+    
+    //value
+    StringCchCopy(text, sizeof("Value"), L"Value");
+    column.pszText = text;
+    SendMessage(listviewwnd, LVM_INSERTCOLUMN, 2, (LPARAM)&column);
+
+    for (int i = 0; i < numberofitems; i++) {
+
+        item.iItem = 0;
+        WCHAR* charbuffer = new WCHAR[PPDataBlob->value[i].header.namesize];
+        StringCchCopyW(charbuffer, PPDataBlob->value[i].header.namesize, PPDataBlob->value[i].policyname);
+        item.pszText = charbuffer;
+        SendMessage(listviewwnd, LVM_INSERTITEM, 0, (LPARAM)&item);
+
+    }    
+
+    for (int i = 0; i < numberofitems; i++) {
+        item.iSubItem = 1;
+        WCHAR* charbuffer = new WCHAR[PPDataBlob->value[i].header.namesize];
+        StringCchCopyW(charbuffer, PPDataBlob->value[i].header.namesize, PPDataBlob->value[i].policyname);
+        item.pszText = charbuffer;
+        SendMessage(listviewwnd, LVM_INSERTITEM, 0, (LPARAM)&item);
+
     }
 
+    ShowWindow(listviewwnd, SW_NORMAL);
+    return 0;
 }
 
 // Global Variables:
@@ -103,8 +187,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     LPBYTE buffer = (LPBYTE)malloc(65536);
     OpenProductPolicyKey(buffer);
-    ParseProductPolicyData(buffer);
-
+    numberofitems = ParseProductPolicyData(buffer);
 
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -175,9 +258,10 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    hInst = hInstance; // Store instance handle in our global variable
+   HINSTANCE* listhInstance = new HINSTANCE;
 
    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
+      CW_USEDEFAULT, 0, 800, 600, nullptr, nullptr, hInstance, nullptr);
 
    if (!hWnd)
    {
@@ -185,6 +269,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    }
 
    ShowWindow(hWnd, nCmdShow);
+
+   InitProductPolicyColumns(hWnd, hInstance, numberofitems);
+
    UpdateWindow(hWnd);
 
    return TRUE;
@@ -213,9 +300,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             case IDM_ABOUT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
                 break;
-            case IDM_EXIT:
-                DestroyWindow(hWnd);
-                break;
+            //case IDM_EXIT:
+            //    DestroyWindow(hWnd);
+            //    break;
             default:
                 return DefWindowProc(hWnd, message, wParam, lParam);
             }
@@ -231,6 +318,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     case WM_DESTROY:
         PostQuitMessage(0);
+        break;
+    case WM_SIZE:
+        RECT rect;
+        GetClientRect(hWnd, &rect);
+        SetWindowPos(listviewwnd, 0, 0, 0, rect.right - rect.left, rect.bottom - rect.top, 0);
         break;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);

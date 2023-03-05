@@ -9,7 +9,7 @@ const LPCWSTR PPRegKeyPath = L"SYSTEM\\CurrentControlSet\\Control\\ProductOption
 
 struct ProductPolicyDataHeader {
 	DWORD totalsize = 0;
-	DWORD numberofvalues = 0;
+	DWORD valuesize = 0;
 	DWORD endmarkersize = 0;
 	DWORD unknown = 0;
 	const DWORD mustbeone = 1;
@@ -34,8 +34,8 @@ enum ProductPolicyValueType : WORD {
 
 struct ProductPolicyValue {
 	ProductPolicyValueHeader header;
-	WCHAR* policyname;
-	char* datavalue;
+	WCHAR* policyname = nullptr;
+	char* datavalue = nullptr;
 };
 
 struct ProductPolicyBlob {
