@@ -45,6 +45,7 @@ void ParseProductPolicyData(LPBYTE buffer) {
     BYTE* valuepointer = buffer + 0x14;
 
     for (int i = 0; i < numvalues; i++) {
+        BYTE* oldvaluepointer = valuepointer;
         PPDataBlob->value[i].header.totalsize = GetWORDAtCurrentPos(valuepointer);
         MovePointerForwardByWORD(valuepointer);
         PPDataBlob->value[i].header.namesize = GetWORDAtCurrentPos(valuepointer);
@@ -55,14 +56,27 @@ void ParseProductPolicyData(LPBYTE buffer) {
         MovePointerForwardByWORD(valuepointer);
         PPDataBlob->value[i].header.flags = GetDWORDAtCurrentPos(valuepointer);
         valuepointer = (valuepointer + (2 * sizeof(DWORD)));
-        PPDataBlob->value[i].policyname = (WCHAR*)malloc(PPDataBlob->value[i].header.namesize);
+        PPDataBlob->value[i].policyname = (WCHAR*)calloc(PPDataBlob->value[i].header.namesize + 2, 1);
+
         wcsncpy(PPDataBlob->value[i].policyname, reinterpret_cast<WCHAR*>(valuepointer), (size_t)(PPDataBlob->value[i].header.namesize / 2));
-        wprintf(PPDataBlob->value[i].policyname);
-        // move forward by length of name
-        //valuepointer = (valuepointer + PPDataBlob->value[i].header.namesize);
+        valuepointer = (valuepointer + PPDataBlob->value[i].header.namesize);
+
+        switch (PPDataBlob->value[i].header.datatype) {
+            case ProductPolicyValueType::PP_DWORD:
+                PPDataBlob->value[i].datavalue = new char[sizeof(DWORD)];
+                for (int j = 0; j <= sizeof(DWORD); j++) {
+                    PPDataBlob->value[i].datavalue[j] = *(valuepointer + j);
+                }
+                break;
+            case ProductPolicyValueType::PP_BINARY:
+                PPDataBlob->value[i].datavalue = new char[PPDataBlob->value[i].header.datasize];
+                for (int j = 0; j <= (PPDataBlob->value[i].header.datasize - 1); j++) {
+                    PPDataBlob->value[i].datavalue[j] = *(valuepointer + j);
+                }
+                break;
+        }
+        valuepointer = oldvaluepointer + PPDataBlob->value[i].header.totalsize;
     }
-    
-    
 
 }
 

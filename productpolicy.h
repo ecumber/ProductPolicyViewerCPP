@@ -35,7 +35,7 @@ enum ProductPolicyValueType : WORD {
 struct ProductPolicyValue {
 	ProductPolicyValueHeader header;
 	WCHAR* policyname;
-	BYTE* value;
+	char* datavalue;
 };
 
 struct ProductPolicyBlob {
