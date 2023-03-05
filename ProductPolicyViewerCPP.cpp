@@ -85,6 +85,12 @@ int ParseProductPolicyData(LPBYTE buffer) {
                     PPDataBlob->value[i].datavalue[j] = *(valuepointer + j);
                 }
                 break;
+            case ProductPolicyValueType::PP_SZ:
+                WCHAR* temp = new WCHAR[PPDataBlob->value[i].header.datasize];
+                StringCchCopyW(temp, PPDataBlob->value[i].header.datasize, reinterpret_cast<WCHAR*>(valuepointer));
+                PPDataBlob->value[i].datavalue = new char[PPDataBlob->value[i].header.datasize / 2];
+                wcstombs(PPDataBlob->value[i].datavalue, temp, PPDataBlob->value[i].header.datasize / 2);
+                break;
         }
         valuepointer = oldvaluepointer + PPDataBlob->value[i].header.totalsize;
         i++;
@@ -121,7 +127,7 @@ extern "C" int InitProductPolicyColumns(HWND parentwnd, HINSTANCE hinstance, int
     item.iSubItem = 0;
     item.state = 0;
     item.cchTextMax = 256;
-    LPWSTR text = (LPWSTR)malloc(sizeof("Policy"));
+    LPWSTR text = (LPWSTR)malloc(16);
     StringCchCopy(text, sizeof("Policy"), L"Policy");
 
     LVCOLUMN column;
@@ -134,16 +140,20 @@ extern "C" int InitProductPolicyColumns(HWND parentwnd, HINSTANCE hinstance, int
     //type
     StringCchCopy(text, sizeof("Type"), L"Type");
     column.pszText = text;
+    column.cx = 128;
     SendMessage(listviewwnd, LVM_INSERTCOLUMN, 1, (LPARAM)&column);
     
     //value
     StringCchCopy(text, sizeof("Value"), L"Value");
     column.pszText = text;
+    column.cx = 256;
     SendMessage(listviewwnd, LVM_INSERTCOLUMN, 2, (LPARAM)&column);
+
+    free(text);
 
     for (int i = 0; i < numberofitems; i++) {
 
-        item.iItem = 0;
+        item.iItem = i;
         WCHAR* charbuffer = new WCHAR[PPDataBlob->value[i].header.namesize];
         StringCchCopyW(charbuffer, PPDataBlob->value[i].header.namesize, PPDataBlob->value[i].policyname);
         item.pszText = charbuffer;
@@ -152,12 +162,48 @@ extern "C" int InitProductPolicyColumns(HWND parentwnd, HINSTANCE hinstance, int
     }    
 
     for (int i = 0; i < numberofitems; i++) {
+        item.iItem = i;
         item.iSubItem = 1;
-        WCHAR* charbuffer = new WCHAR[PPDataBlob->value[i].header.namesize];
-        StringCchCopyW(charbuffer, PPDataBlob->value[i].header.namesize, PPDataBlob->value[i].policyname);
+        WCHAR charbuffer[16] = L"Unknown"; // fallback if it messes up
+        switch (PPDataBlob->value[i].header.datatype) {
+            case ProductPolicyValueType::PP_BINARY:
+                StringCchCopyW(charbuffer, 7, L"Binary");
+                break;
+            case ProductPolicyValueType::PP_DWORD:
+                StringCchCopyW(charbuffer, 6, L"DWORD");
+                break;
+            case ProductPolicyValueType::PP_SZ:
+                StringCchCopyW(charbuffer, 8, L"String");
+                break;
+        }
+        
         item.pszText = charbuffer;
-        SendMessage(listviewwnd, LVM_INSERTITEM, 0, (LPARAM)&item);
+        SendMessage(listviewwnd, LVM_SETITEM, 0, (LPARAM)&item);
+    }
 
+    for (int i = 0; i < numberofitems; i++) {
+        unsigned int datavalue = 0;
+        WCHAR* string = nullptr;
+        item.iItem = i;
+        item.iSubItem = 2;
+        WCHAR charbuffer[256] = L"Unknown"; // fallback if it messes up
+        switch (PPDataBlob->value[i].header.datatype) {
+        case ProductPolicyValueType::PP_BINARY:
+            StringCchCopyW(charbuffer, 7, L"Binary");
+            break;
+        case ProductPolicyValueType::PP_DWORD:
+            datavalue = *reinterpret_cast<int*>(PPDataBlob->value[i].datavalue);
+            wsprintf(charbuffer, L"%u", datavalue);
+            break;
+        case ProductPolicyValueType::PP_SZ:
+            string = new WCHAR[PPDataBlob->value[i].header.datasize];
+            mbstowcs(string, PPDataBlob->value[i].datavalue, PPDataBlob->value[i].header.datasize);
+            StringCchCopyW(charbuffer, 256, string);
+            break;
+        }
+
+        item.pszText = charbuffer;
+        SendMessage(listviewwnd, LVM_SETITEM, 0, (LPARAM)&item);
     }
 
     ShowWindow(listviewwnd, SW_NORMAL);
@@ -188,6 +234,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     LPBYTE buffer = (LPBYTE)malloc(65536);
     OpenProductPolicyKey(buffer);
     numberofitems = ParseProductPolicyData(buffer);
+    free(buffer);
 
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
