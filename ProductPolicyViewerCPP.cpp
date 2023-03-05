@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <commctrl.h>
 #include <strsafe.h>
+#include <cassert>
 
 #define MAX_LOADSTRING 100
 static ProductPolicyBlob* PPDataBlob;
@@ -19,7 +20,6 @@ LSTATUS OpenProductPolicyKey(LPBYTE output) {
     DWORD bytesread;
     result = RegQueryValueExW(PPKey, L"ProductPolicy", 0, NULL, output, &bytesread);
     return result;
-    
 }
 
 #define GetDWORDAtCurrentPos(pos) *reinterpret_cast<DWORD*>(pos)
@@ -67,7 +67,7 @@ int ParseProductPolicyData(LPBYTE buffer) {
         MovePointerForwardByWORD(valuepointer);
         PPDataBlob->value[i].header.flags = GetDWORDAtCurrentPos(valuepointer);
         valuepointer = (valuepointer + (2 * sizeof(DWORD)));
-        PPDataBlob->value[i].policyname = (WCHAR*)calloc(PPDataBlob->value[i].header.namesize + 2, 1);
+        PPDataBlob->value[i].policyname = (WCHAR*)malloc(PPDataBlob->value[i].header.namesize + 2);
 
         wcsncpy(PPDataBlob->value[i].policyname, reinterpret_cast<WCHAR*>(valuepointer), (size_t)(PPDataBlob->value[i].header.namesize / 2));
         valuepointer = (valuepointer + PPDataBlob->value[i].header.namesize);
@@ -232,9 +232,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     // TODO: Place code here.
 
     LPBYTE buffer = (LPBYTE)malloc(65536);
-    OpenProductPolicyKey(buffer);
+    LRESULT result = OpenProductPolicyKey(buffer);
+    assert(result == 0);
     numberofitems = ParseProductPolicyData(buffer);
-    free(buffer);
 
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
