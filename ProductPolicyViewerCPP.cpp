@@ -18,10 +18,18 @@ HWND listviewwnd;
 LSTATUS OpenProductPolicyKey(LPBYTE output) {
     HKEY PPKey = NULL;
     LSTATUS result = RegOpenKeyExW(HKEY_LOCAL_MACHINE, PPRegKeyPath, 0, KEY_READ, &PPKey);
+    if (result != ERROR_SUCCESS) goto error;
     DWORD bytesread;
     result = RegQueryValueExW(PPKey, L"ProductPolicy", 0, NULL, output, &bytesread);
+    if (result != ERROR_SUCCESS) goto error;
     return result;
     
+error:
+    LPWSTR errormsg = new WCHAR[50];
+    wsprintfW(errormsg, L"RegOpenKeyExW failed with %d", result);
+    MessageBoxW(NULL, errormsg, L"Error", MB_ICONERROR);
+    delete[] errormsg;
+    ExitProcess(1);
 }
 
 #define GetDWORDAtCurrentPos(pos) *reinterpret_cast<DWORD*>(pos)
@@ -122,7 +130,7 @@ extern "C" int InitProductPolicyColumns(HWND parentwnd, HINSTANCE hinstance, int
         hinstance, NULL);
     SetWindowText(listviewwnd, L"Leo");
 
-    LVITEM item;
+    LVITEM item = { 0 };
     item.pszText = LPSTR_TEXTCALLBACK; // Sends an LVN_GETDISPINFO message.
     item.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_STATE;
     item.stateMask = 0;
@@ -132,7 +140,7 @@ extern "C" int InitProductPolicyColumns(HWND parentwnd, HINSTANCE hinstance, int
     LPWSTR text = (LPWSTR)malloc(16);
     StringCchCopy(text, sizeof("Policy"), L"Policy");
 
-    LVCOLUMN column;
+    LVCOLUMN column = { 0 };
     column.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
     column.pszText = text;
     column.cx = 256;
@@ -191,7 +199,7 @@ extern "C" int InitProductPolicyColumns(HWND parentwnd, HINSTANCE hinstance, int
         item.iItem = i;
         item.iSubItem = 2;
         WCHAR charbuffer[256] = L"Unknown"; // fallback if it messes up
-        UINT8 type = PPDataBlob->value[i].header.datatype;
+        UINT8 type = static_cast<UINT8>(PPDataBlob->value[i].header.datatype);
         switch (type) {
         case ProductPolicyValueType::PP_BINARY:
 
@@ -285,7 +293,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 //
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
-    WNDCLASSEXW wcex;
+    WNDCLASSEXW wcex = { 0 };
 
     wcex.cbSize = sizeof(WNDCLASSEX);
 

@@ -18,7 +18,7 @@ struct ProductPolicyDataHeader {
 struct ProductPolicyValueHeader {
 	WORD totalsize = 0;
 	WORD namesize = 0;
-	WORD datatype;
+	WORD datatype = 0;
 	WORD datasize = 0;
 	DWORD flags = 0;
 	DWORD unknown = 0;
