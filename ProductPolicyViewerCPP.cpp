@@ -8,6 +8,8 @@
 #include <commctrl.h>
 #include <strsafe.h>
 
+#pragma warning( disable : 4995 )
+
 #define MAX_LOADSTRING 100
 static ProductPolicyBlob* PPDataBlob;
 static int numberofitems = 0;
@@ -126,7 +128,7 @@ extern "C" int InitProductPolicyColumns(HWND parentwnd, HINSTANCE hinstance, int
     item.stateMask = 0;
     item.iSubItem = 0;
     item.state = 0;
-    item.cchTextMax = 256;
+    item.cchTextMax = 320;
     LPWSTR text = (LPWSTR)malloc(16);
     StringCchCopy(text, sizeof("Policy"), L"Policy");
 
@@ -183,13 +185,23 @@ extern "C" int InitProductPolicyColumns(HWND parentwnd, HINSTANCE hinstance, int
 
     for (int i = 0; i < numberofitems; i++) {
         unsigned int datavalue = 0;
+        char* bytes = nullptr;
+
         WCHAR* string = nullptr;
         item.iItem = i;
         item.iSubItem = 2;
         WCHAR charbuffer[256] = L"Unknown"; // fallback if it messes up
-        switch (PPDataBlob->value[i].header.datatype) {
+        UINT8 type = PPDataBlob->value[i].header.datatype;
+        switch (type) {
         case ProductPolicyValueType::PP_BINARY:
-            StringCchCopyW(charbuffer, 7, L"Binary");
+
+            bytes = new char[PPDataBlob->value[i].header.datasize + 1];
+            for (int j = 0; j < (PPDataBlob->value[i].header.datasize); j++)
+                bytes[j] = *(PPDataBlob->value[i].datavalue + j);
+            bytes[PPDataBlob->value[i].header.datasize + 1] = 0;
+            
+            wsprintf(charbuffer, L"0x%x", *bytes);
+
             break;
         case ProductPolicyValueType::PP_DWORD:
             datavalue = *reinterpret_cast<int*>(PPDataBlob->value[i].datavalue);
