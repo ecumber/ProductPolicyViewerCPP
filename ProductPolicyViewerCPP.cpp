@@ -17,9 +17,9 @@ HWND listviewwnd;
 
 LSTATUS OpenProductPolicyKey(LPBYTE output) {
     HKEY PPKey = NULL;
+    DWORD bytesread = 65536;
     LSTATUS result = RegOpenKeyExW(HKEY_LOCAL_MACHINE, PPRegKeyPath, 0, KEY_READ, &PPKey);
     if (result != ERROR_SUCCESS) goto error;
-    DWORD bytesread;
     result = RegQueryValueExW(PPKey, L"ProductPolicy", 0, NULL, output, &bytesread);
     if (result != ERROR_SUCCESS) goto error;
     return result;
@@ -206,7 +206,7 @@ extern "C" int InitProductPolicyColumns(HWND parentwnd, HINSTANCE hinstance, int
             bytes = new char[PPDataBlob->value[i].header.datasize + 1];
             for (int j = 0; j < (PPDataBlob->value[i].header.datasize); j++)
                 bytes[j] = *(PPDataBlob->value[i].datavalue + j);
-            bytes[PPDataBlob->value[i].header.datasize + 1] = 0;
+            bytes[PPDataBlob->value[i].header.datasize] = 0;
             
             wsprintf(charbuffer, L"0x%x", *bytes);
 
@@ -249,12 +249,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
-    // TODO: Place code here.
-
-    LPBYTE buffer = (LPBYTE)malloc(65536);
+    LPBYTE buffer = new BYTE[65536];
     OpenProductPolicyKey(buffer);
     numberofitems = ParseProductPolicyData(buffer);
-    free(buffer);
+    delete[] buffer;
 
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
