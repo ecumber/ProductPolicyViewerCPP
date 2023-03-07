@@ -51,7 +51,7 @@ int ParseProductPolicyData(LPBYTE buffer) {
     PPDataBlob->dataheader->valuesize = GetDWORDAtCurrentPos(currentposition);
     int valuesize = PPDataBlob->dataheader->valuesize;
 
-    PPDataBlob->value = new ProductPolicyValue[0x0923];
+    PPDataBlob->value = new ProductPolicyValue[0x0923]; // upper limit of values
     MovePointerForwardByDWORD(currentposition);
     PPDataBlob->dataheader->endmarkersize = GetDWORDAtCurrentPos(currentposition);
 
@@ -77,7 +77,8 @@ int ParseProductPolicyData(LPBYTE buffer) {
         MovePointerForwardByWORD(valuepointer);
         PPDataBlob->value[i].header.flags = GetDWORDAtCurrentPos(valuepointer);
         valuepointer = (valuepointer + (2 * sizeof(DWORD)));
-        PPDataBlob->value[i].policyname = (WCHAR*)calloc(PPDataBlob->value[i].header.namesize + 2, 1);
+        PPDataBlob->value[i].policyname = new WCHAR[PPDataBlob->value[i].header.namesize + 2];
+        memset(PPDataBlob->value[i].policyname, 0, PPDataBlob->value[i].header.namesize + 2);
 
         wcsncpy(PPDataBlob->value[i].policyname, reinterpret_cast<WCHAR*>(valuepointer), (size_t)(PPDataBlob->value[i].header.namesize / 2));
         valuepointer = (valuepointer + PPDataBlob->value[i].header.namesize);
@@ -130,20 +131,19 @@ extern "C" int InitProductPolicyColumns(HWND parentwnd, HINSTANCE hinstance, int
         hinstance, NULL);
     SetWindowText(listviewwnd, L"Leo");
 
+    ListView_SetExtendedListViewStyleEx(listviewwnd, LVS_REPORT | LVS_EX_GRIDLINES, LVS_REPORT | LVS_EX_GRIDLINES);
+
     LVITEM item = { 0 };
     item.pszText = LPSTR_TEXTCALLBACK; // Sends an LVN_GETDISPINFO message.
     item.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_STATE;
-    item.stateMask = 0;
-    item.iSubItem = 0;
-    item.state = 0;
-    item.cchTextMax = 320;
-    LPWSTR text = (LPWSTR)malloc(16);
+    item.cchTextMax = 256;
+    LPWSTR text = new WCHAR[16];
     StringCchCopy(text, sizeof("Policy"), L"Policy");
 
     LVCOLUMN column = { 0 };
     column.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
     column.pszText = text;
-    column.cx = 256;
+    column.cx = 360;
 
     SendMessage(listviewwnd, LVM_INSERTCOLUMN, 0, (LPARAM)&column);
 
@@ -159,7 +159,7 @@ extern "C" int InitProductPolicyColumns(HWND parentwnd, HINSTANCE hinstance, int
     column.cx = 256;
     SendMessage(listviewwnd, LVM_INSERTCOLUMN, 2, (LPARAM)&column);
 
-    free(text);
+    delete[] text;
 
     for (int i = 0; i < numberofitems; i++) {
 
@@ -191,25 +191,22 @@ extern "C" int InitProductPolicyColumns(HWND parentwnd, HINSTANCE hinstance, int
         SendMessage(listviewwnd, LVM_SETITEM, 0, (LPARAM)&item);
     }
 
-    for (int i = 0; i < numberofitems; i++) {
-        unsigned int datavalue = 0;
-        char* bytes = nullptr;
+    unsigned int datavalue = 0;
+    char* bytes = nullptr;
+    WCHAR* string = nullptr;
 
-        WCHAR* string = nullptr;
+    for (int i = 0; i < numberofitems; i++) {
         item.iItem = i;
         item.iSubItem = 2;
         WCHAR charbuffer[256] = L"Unknown"; // fallback if it messes up
         UINT8 type = static_cast<UINT8>(PPDataBlob->value[i].header.datatype);
         switch (type) {
         case ProductPolicyValueType::PP_BINARY:
-
             bytes = new char[PPDataBlob->value[i].header.datasize + 1];
             for (int j = 0; j < (PPDataBlob->value[i].header.datasize); j++)
                 bytes[j] = *(PPDataBlob->value[i].datavalue + j);
             bytes[PPDataBlob->value[i].header.datasize] = 0;
-            
             wsprintf(charbuffer, L"0x%x", *bytes);
-
             break;
         case ProductPolicyValueType::PP_DWORD:
             datavalue = *reinterpret_cast<int*>(PPDataBlob->value[i].datavalue);
@@ -225,6 +222,8 @@ extern "C" int InitProductPolicyColumns(HWND parentwnd, HINSTANCE hinstance, int
         item.pszText = charbuffer;
         SendMessage(listviewwnd, LVM_SETITEM, 0, (LPARAM)&item);
     }
+    delete[] bytes;
+    delete CommonControlSex;
 
     ShowWindow(listviewwnd, SW_NORMAL);
     return 0;
@@ -355,18 +354,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
+    case WM_NOTIFY:
+        switch (lParam) {
+            case LVN_BEGINLABELEDIT:
+                MessageBox(NULL, L"Hi", L"Hi", 0);
+        }
+
     case WM_COMMAND:
         {
-            int wmId = LOWORD(wParam);
-            // Parse the menu selections:
-            switch (wmId)
-            {
-            //case IDM_EXIT:
-            //    DestroyWindow(hWnd);
-            //    break;
-            default:
-                return DefWindowProc(hWnd, message, wParam, lParam);
-            }
+            return DefWindowProc(hWnd, message, wParam, lParam);
         }
         break;
     case WM_PAINT:
@@ -390,3 +386,4 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     }
     return 0;
 }
+
