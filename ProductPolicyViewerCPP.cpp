@@ -102,7 +102,6 @@ int ParseProductPolicyData(LPBYTE buffer) {
                 StringCchCopyW(temp, PPDataBlob->value[i].header.datasize, reinterpret_cast<WCHAR*>(valuepointer));
                 PPDataBlob->value[i].datavalue = new char[PPDataBlob->value[i].header.datasize / 2];
                 wcstombs(PPDataBlob->value[i].datavalue, temp, PPDataBlob->value[i].header.datasize / 2);
-                PPDataBlob->value[i].datavalue[PPDataBlob->value[i].header.datasize] = 0; // null terminator
                 break;
         }
         valuepointer = oldvaluepointer + PPDataBlob->value[i].header.totalsize;
@@ -340,6 +339,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
    UpdateWindow(hWnd);
 
+   delete listhInstance;
+
    return TRUE;
 }
 
@@ -377,6 +378,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         break;
     case WM_DESTROY:
+        delete[] PPDataBlob->value;
+        delete PPDataBlob->dataheader, PPDataBlob;
         PostQuitMessage(0);
         break;
     case WM_SIZE:
@@ -423,19 +426,10 @@ void CommandLineFunc() {
             break;
 
         }
-        mbstowcs(datavalue, temp, 256);
+        mbstowcs(datavalue, temp, PPDataBlob->value[i].header.datasize);
 
         StringCchPrintfW(buffer, 512, L"%s\n\tType: %s\n\tValue: %s\n", PPDataBlob->value[i].policyname, datatype, datavalue);
         wprintf(buffer);
-
     }
-}
-
-int main(int argc, char* argv[]) {
-    if (argc == 1) {
-        FreeConsole();
-        wWinMain(GetModuleHandle(NULL), NULL, NULL, 1);
-    }
-    else
-        CommandLineFunc();
+    delete[] datavalue, buffer;
 }
