@@ -13,6 +13,7 @@
 #define MAX_LOADSTRING 100
 static ProductPolicyBlob* PPDataBlob;
 static int numberofitems = 0;
+static bool commandlinemode = false;
 HWND listviewwnd;
 
 LSTATUS OpenProductPolicyKey(LPBYTE output) {
@@ -101,6 +102,7 @@ int ParseProductPolicyData(LPBYTE buffer) {
                 StringCchCopyW(temp, PPDataBlob->value[i].header.datasize, reinterpret_cast<WCHAR*>(valuepointer));
                 PPDataBlob->value[i].datavalue = new char[PPDataBlob->value[i].header.datasize / 2];
                 wcstombs(PPDataBlob->value[i].datavalue, temp, PPDataBlob->value[i].header.datasize / 2);
+                PPDataBlob->value[i].datavalue[PPDataBlob->value[i].header.datasize] = 0; // null terminator
                 break;
         }
         valuepointer = oldvaluepointer + PPDataBlob->value[i].header.totalsize;
@@ -108,6 +110,7 @@ int ParseProductPolicyData(LPBYTE buffer) {
     }
     return i;
 }
+
 
 
 extern "C" int InitProductPolicyColumns(HWND parentwnd, HINSTANCE hinstance, int numberofitems) {
@@ -387,3 +390,52 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
+void CommandLineFunc() {
+    char temp[320] = { 0 };
+    LPBYTE ppbuffer = new BYTE[65536];
+    OpenProductPolicyKey(ppbuffer);
+    numberofitems = ParseProductPolicyData(ppbuffer);
+    delete[] ppbuffer;
+
+    WCHAR datatype[16] = L"Unknown";
+    WCHAR* datavalue = new WCHAR[128];
+    WCHAR* buffer = new WCHAR[512];
+
+    HANDLE out_handle = GetStdHandle(STD_OUTPUT_HANDLE);
+
+    memset(datavalue, 0, 128);
+    memset(buffer, 0, 256);
+
+    for (int i = 0; i < numberofitems; i++) {
+        memset(buffer, 0, 256);
+        switch (PPDataBlob->value[i].header.datatype) {
+        case ProductPolicyValueType::PP_SZ:
+            StringCchCopyW(datatype, sizeof(L"String"), L"String");
+            StringCchPrintfA(temp, 320, "%s", PPDataBlob->value[i].datavalue);
+            break;
+        case ProductPolicyValueType::PP_BINARY:
+            StringCchCopyW(datatype, sizeof(L"Binary"), L"Binary");
+            StringCchPrintfA(temp, 320, "0x%x", *PPDataBlob->value[i].datavalue);
+            break;
+        case ProductPolicyValueType::PP_DWORD:
+            StringCchCopyW(datatype, sizeof(L"DWORD"), L"DWORD");
+            StringCchPrintfA(temp, 320, "%d", (DWORD)*PPDataBlob->value[i].datavalue);
+            break;
+
+        }
+        mbstowcs(datavalue, temp, 256);
+
+        StringCchPrintfW(buffer, 512, L"%s\n\tType: %s\n\tValue: %s\n", PPDataBlob->value[i].policyname, datatype, datavalue);
+        wprintf(buffer);
+
+    }
+}
+
+int main(int argc, char* argv[]) {
+    if (argc == 1) {
+        FreeConsole();
+        wWinMain(GetModuleHandle(NULL), NULL, NULL, 1);
+    }
+    else
+        CommandLineFunc();
+}

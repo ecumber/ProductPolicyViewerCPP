@@ -4,7 +4,6 @@
 
 const LPCWSTR PPRegKeyPath = L"SYSTEM\\CurrentControlSet\\Control\\ProductOptions";
 
-
 // https://www.geoffchappell.com/studies/windows/km/ntoskrnl/api/ex/slmem/productpolicy.htm
 
 struct ProductPolicyDataHeader {
