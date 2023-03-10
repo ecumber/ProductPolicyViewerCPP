@@ -96,7 +96,9 @@ int ParseProductPolicyData(LPBYTE buffer) {
             StringCchCopyW(temp, PPDataBlob->value[i].header.datasize, reinterpret_cast<WCHAR*>(valuepointer));
             PPDataBlob->value[i].datavalue = new char[PPDataBlob->value[i].header.datasize / 2];
             wcstombs(PPDataBlob->value[i].datavalue, temp, PPDataBlob->value[i].header.datasize / 2);
-            PPDataBlob->value[i].datavalue[PPDataBlob->value[i].header.datasize] = 0; // null terminator
+            if (PPDataBlob->value[i].datavalue[(PPDataBlob->value[i].header.datasize / 2) - 1] != 0) {
+                PPDataBlob->value[i].datavalue[PPDataBlob->value[i].header.datasize / 2] = 0;
+            }
             break;
         }
         valuepointer = oldvaluepointer + PPDataBlob->value[i].header.totalsize;
@@ -108,15 +110,14 @@ int ParseProductPolicyData(LPBYTE buffer) {
 
 int main()
 {
-    char temp[320] = { 0 };
+    char* temp = new char[320];
     LPBYTE ppbuffer = new BYTE[65536];
     OpenProductPolicyKey(ppbuffer);
     numberofitems = ParseProductPolicyData(ppbuffer);
     delete[] ppbuffer;
     
     WCHAR datatype[16] = L"Unknown";
-    WCHAR* datavalue = new WCHAR[128];
-    WCHAR* buffer = new WCHAR[512];
+    WCHAR* datavalue = new WCHAR[2048];
     
     HANDLE out_handle = GetStdHandle(STD_OUTPUT_HANDLE);
     
@@ -132,14 +133,14 @@ int main()
             break;
         case ProductPolicyValueType::PP_DWORD:
             StringCchCopyW(datatype, sizeof(L"DWORD"), L"DWORD");
-            StringCchPrintfA(temp, 256, "%d", (DWORD)*PPDataBlob->value[i].datavalue);
+            StringCchPrintfA(temp, 256, "%u", (DWORD)*PPDataBlob->value[i].datavalue);
             break;
     
         }
         mbstowcs(datavalue, temp, 256);
-        wprintf(L"%d %s\n\tType: %s\n\tValue: %s\n", i, PPDataBlob->value[i].policyname, datatype, datavalue);
+        wprintf(L"%d: %s\n\tType: %s\n\tValue: %s\n", i, PPDataBlob->value[i].policyname, datatype, datavalue);
     }
-    delete[] datavalue, buffer;
+    delete[] datavalue, temp;
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
