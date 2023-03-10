@@ -138,7 +138,7 @@ extern "C" int InitProductPolicyColumns(HWND parentwnd, HINSTANCE hinstance, int
     LVITEM item = { 0 };
     item.pszText = LPSTR_TEXTCALLBACK; // Sends an LVN_GETDISPINFO message.
     item.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_STATE;
-    item.cchTextMax = 256;
+    item.cchTextMax = 512;
     LPWSTR text = new WCHAR[16];
     StringCchCopy(text, sizeof("Policy"), L"Policy");
 
@@ -200,7 +200,7 @@ extern "C" int InitProductPolicyColumns(HWND parentwnd, HINSTANCE hinstance, int
     for (int i = 0; i < numberofitems; i++) {
         item.iItem = i;
         item.iSubItem = 2;
-        WCHAR charbuffer[256] = L"Unknown"; // fallback if it messes up
+        WCHAR charbuffer[512] = L"Unknown"; // fallback if it messes up
         UINT8 type = static_cast<UINT8>(PPDataBlob->value[i].header.datatype);
         switch (type) {
         case ProductPolicyValueType::PP_BINARY:
@@ -217,7 +217,7 @@ extern "C" int InitProductPolicyColumns(HWND parentwnd, HINSTANCE hinstance, int
         case ProductPolicyValueType::PP_SZ:
             string = new WCHAR[PPDataBlob->value[i].header.datasize];
             mbstowcs(string, PPDataBlob->value[i].datavalue, PPDataBlob->value[i].header.datasize);
-            StringCchCopyW(charbuffer, 256, string);
+            StringCchCopyW(charbuffer, 512, string);
             break;
         }
 
@@ -344,6 +344,70 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    return TRUE;
 }
 
+static LVITEM selecteditem;
+
+INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
+    HWND dialogitem = { 0 };
+    WCHAR* temp = new WCHAR[512];
+    HGLOBAL hMem = 0;
+    size_t len;
+    char* output;
+    UNREFERENCED_PARAMETER(lParam);
+
+    switch (message)
+    {
+    case WM_INITDIALOG:
+
+        dialogitem = GetDlgItem(hDlg, IDC_EDIT1);
+        ListView_GetItemText(listviewwnd, selecteditem.iItem, 0, temp, 512);
+        SetWindowText(hDlg, temp);
+        SetWindowText(dialogitem, temp);
+
+        dialogitem = GetDlgItem(hDlg, IDC_EDIT2);
+        ListView_GetItemText(listviewwnd, selecteditem.iItem, 2, temp, 512);
+        SetWindowText(dialogitem, temp);
+
+        return (INT_PTR)TRUE;
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam))
+        {
+            case IDOK:
+                EndDialog(hDlg, LOWORD(wParam));
+                return (INT_PTR)TRUE;
+                break;
+            case IDCOPYP:
+                output = new char[256];
+                ListView_GetItemText(listviewwnd, selecteditem.iItem, 0, temp, 512);
+                wcstombs(output, temp, 256);
+                len = strlen(output) + 1;
+                hMem = GlobalAlloc(GMEM_MOVEABLE, len);
+                memcpy(GlobalLock(hMem), output, len);
+                GlobalUnlock(hMem);
+                OpenClipboard(0);
+                EmptyClipboard();
+                SetClipboardData(CF_TEXT, hMem);
+                CloseClipboard();
+                break;
+            case IDCOPYV:
+                char* output = new char[256];
+                ListView_GetItemText(listviewwnd, selecteditem.iItem, 2, temp, 512);
+                wcstombs(output, temp, 256);
+                len = strlen(output) + 1;
+                hMem = GlobalAlloc(GMEM_MOVEABLE, len);
+                memcpy(GlobalLock(hMem), output, len);
+                GlobalUnlock(hMem);
+                OpenClipboard(0);
+                EmptyClipboard();
+                SetClipboardData(CF_TEXT, hMem);
+                CloseClipboard();
+                break;
+        }
+        break;
+    }
+    return (INT_PTR)FALSE;
+}
+
 //
 //  FUNCTION: WndProc(HWND, UINT, WPARAM, LPARAM)
 //
@@ -359,10 +423,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     switch (message)
     {
     case WM_NOTIFY:
-        switch (lParam) {
-            case LVN_BEGINLABELEDIT:
-                MessageBox(NULL, L"Hi", L"Hi", 0);
+    {
+        if ((((LPNMHDR)lParam)->hwndFrom) == listviewwnd)
+        {
+            switch (((LPNMHDR)lParam)->code)
+            {
+            case NM_DBLCLK:
+            {
+                int item = (int)SendMessage(listviewwnd, LVM_GETNEXTITEM, -1, LVNI_SELECTED);
+                selecteditem.iItem = item;
+                ListView_GetItem(listviewwnd, &selecteditem);
+
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_EDITDIALOG), hWnd, DialogProc);
+            }
+            break;
+            }
         }
+        break;
+    }
 
     case WM_COMMAND:
         {
@@ -391,45 +469,4 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
     return 0;
-}
-
-void CommandLineFunc() {
-    char temp[320] = { 0 };
-    LPBYTE ppbuffer = new BYTE[65536];
-    OpenProductPolicyKey(ppbuffer);
-    numberofitems = ParseProductPolicyData(ppbuffer);
-    delete[] ppbuffer;
-
-    WCHAR datatype[16] = L"Unknown";
-    WCHAR* datavalue = new WCHAR[128];
-    WCHAR* buffer = new WCHAR[512];
-
-    HANDLE out_handle = GetStdHandle(STD_OUTPUT_HANDLE);
-
-    memset(datavalue, 0, 128);
-    memset(buffer, 0, 256);
-
-    for (int i = 0; i < numberofitems; i++) {
-        memset(buffer, 0, 256);
-        switch (PPDataBlob->value[i].header.datatype) {
-        case ProductPolicyValueType::PP_SZ:
-            StringCchCopyW(datatype, sizeof(L"String"), L"String");
-            StringCchPrintfA(temp, 320, "%s", PPDataBlob->value[i].datavalue);
-            break;
-        case ProductPolicyValueType::PP_BINARY:
-            StringCchCopyW(datatype, sizeof(L"Binary"), L"Binary");
-            StringCchPrintfA(temp, 320, "0x%x", *PPDataBlob->value[i].datavalue);
-            break;
-        case ProductPolicyValueType::PP_DWORD:
-            StringCchCopyW(datatype, sizeof(L"DWORD"), L"DWORD");
-            StringCchPrintfA(temp, 320, "%d", (DWORD)*PPDataBlob->value[i].datavalue);
-            break;
-
-        }
-        mbstowcs(datavalue, temp, PPDataBlob->value[i].header.datasize);
-
-        StringCchPrintfW(buffer, 512, L"%s\n\tType: %s\n\tValue: %s\n", PPDataBlob->value[i].policyname, datatype, datavalue);
-        wprintf(buffer);
-    }
-    delete[] datavalue, buffer;
 }
