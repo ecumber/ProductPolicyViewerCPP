@@ -3,7 +3,6 @@
 
 #include <iostream>
 #include <windows.h>
-#include "productpolicy.h"
 #include <strsafe.h>
 #include <ProductPolicyViewerCPP/productpolicy.h>
 
