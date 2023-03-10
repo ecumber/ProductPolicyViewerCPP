@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.33414.496
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ProductPolicyViewerCPP", "ProductPolicyViewerCPP.vcxproj", "{ADFB6003-CD0D-42F7-B340-8D90D9FAF624}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ProductPolicyViewerCPP", "ProductPolicyViewerCPP\ProductPolicyViewerCPP.vcxproj", "{ADFB6003-CD0D-42F7-B340-8D90D9FAF624}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ProductPolicyViewerConsole", "ProductPolicyViewerConsole\ProductPolicyViewerConsole.vcxproj", "{B79F2CE2-72F2-4292-9717-70E23C06F4A1}"
 EndProject
