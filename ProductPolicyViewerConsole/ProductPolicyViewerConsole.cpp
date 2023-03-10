@@ -5,6 +5,7 @@
 #include <windows.h>
 #include "productpolicy.h"
 #include <strsafe.h>
+#include <ProductPolicyViewerCPP/productpolicy.h>
 
 #define GetDWORDAtCurrentPos(pos) *reinterpret_cast<DWORD*>(pos)
 #define MovePointerForwardByDWORD(pos) pos = (pos + sizeof(DWORD))
