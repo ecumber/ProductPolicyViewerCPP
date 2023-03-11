@@ -26,8 +26,8 @@ LSTATUS OpenProductPolicyKey(LPBYTE output) {
     return result;
     
 error:
-    LPWSTR errormsg = new WCHAR[50];
-    wsprintfW(errormsg, L"RegOpenKeyExW failed with %d", result);
+    LPWSTR errormsg = new WCHAR[48];
+    wsprintfW(errormsg, L"OpenProductPolicyKey failed with %d", result);
     MessageBoxW(NULL, errormsg, L"Error", MB_ICONERROR);
     delete[] errormsg;
     ExitProcess(1);
@@ -346,18 +346,31 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 static LVITEM selecteditem;
 
+void CopyPPValue(WCHAR* value) {
+    char* output = new char[256];
+    wcstombs(output, value, 256);
+    size_t len = strlen(output) + 1;
+    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, len);
+    memcpy(GlobalLock(hMem), output, len);
+    GlobalUnlock(hMem);
+    OpenClipboard(0);
+    EmptyClipboard();
+    SetClipboardData(CF_TEXT, hMem);
+    CloseClipboard();
+    GlobalFree(hMem);
+    return;
+}
+
 INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
     HWND dialogitem = { 0 };
     WCHAR* temp = new WCHAR[512];
     HGLOBAL hMem = 0;
-    size_t len;
-    char* output;
+    size_t len = 0;
     UNREFERENCED_PARAMETER(lParam);
 
     switch (message)
     {
     case WM_INITDIALOG:
-
         dialogitem = GetDlgItem(hDlg, IDC_EDIT1);
         ListView_GetItemText(listviewwnd, selecteditem.iItem, 0, temp, 512);
         SetWindowText(hDlg, temp);
@@ -373,34 +386,19 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
         switch (LOWORD(wParam))
         {
             case IDOK:
+                delete[] temp;
                 EndDialog(hDlg, LOWORD(wParam));
                 return (INT_PTR)TRUE;
                 break;
             case IDCOPYP:
-                output = new char[256];
                 ListView_GetItemText(listviewwnd, selecteditem.iItem, 0, temp, 512);
-                wcstombs(output, temp, 256);
-                len = strlen(output) + 1;
-                hMem = GlobalAlloc(GMEM_MOVEABLE, len);
-                memcpy(GlobalLock(hMem), output, len);
-                GlobalUnlock(hMem);
-                OpenClipboard(0);
-                EmptyClipboard();
-                SetClipboardData(CF_TEXT, hMem);
-                CloseClipboard();
+                CopyPPValue(temp);
+                return (INT_PTR)TRUE;
                 break;
             case IDCOPYV:
-                char* output = new char[256];
                 ListView_GetItemText(listviewwnd, selecteditem.iItem, 2, temp, 512);
-                wcstombs(output, temp, 256);
-                len = strlen(output) + 1;
-                hMem = GlobalAlloc(GMEM_MOVEABLE, len);
-                memcpy(GlobalLock(hMem), output, len);
-                GlobalUnlock(hMem);
-                OpenClipboard(0);
-                EmptyClipboard();
-                SetClipboardData(CF_TEXT, hMem);
-                CloseClipboard();
+                CopyPPValue(temp);
+                return (INT_PTR)TRUE;
                 break;
         }
         break;
@@ -431,10 +429,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             case NM_DBLCLK:
             {
                 int item = (int)SendMessage(listviewwnd, LVM_GETNEXTITEM, -1, LVNI_SELECTED);
-                selecteditem.iItem = item;
-                ListView_GetItem(listviewwnd, &selecteditem);
-
-                DialogBox(hInst, MAKEINTRESOURCE(IDD_EDITDIALOG), hWnd, DialogProc);
+                if (item != -1) { // getnextitem sets the item to -1 (0xffffffff) if there is no item selected
+                    selecteditem.iItem = item;
+                    ListView_GetItem(listviewwnd, &selecteditem);
+                    DialogBox(hInst, MAKEINTRESOURCE(IDD_EDITDIALOG), hWnd, DialogProc);
+                }
             }
             break;
             }
