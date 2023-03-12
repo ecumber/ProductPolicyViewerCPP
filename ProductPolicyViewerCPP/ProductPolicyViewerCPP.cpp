@@ -176,7 +176,7 @@ extern "C" int InitProductPolicyColumns(HWND parentwnd, HINSTANCE hinstance, int
     for (int i = 0; i < numberofitems; i++) {
         item.iItem = i;
         item.iSubItem = 1;
-        WCHAR charbuffer[16] = L"Unknown"; // fallback if it messes up
+        WCHAR charbuffer[8] = L"Unknown"; // fallback if it messes up
         switch (PPDataBlob->value[i].header.datatype) {
             case ProductPolicyValueType::PP_BINARY:
                 StringCchCopyW(charbuffer, 7, L"Binary");
@@ -361,8 +361,15 @@ void CopyPPValue(WCHAR* value) {
     return;
 }
 
+void SetDlgText(HWND hDlg, int item, int index) {
+    WCHAR* temp = new WCHAR[512];
+    HWND dialogitem = GetDlgItem(hDlg, item);
+    ListView_GetItemText(listviewwnd, selecteditem.iItem, index, temp, 512);
+    SetWindowText(dialogitem, temp);
+    delete[] temp;
+}
+
 INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
-    HWND dialogitem = { 0 };
     WCHAR* temp = new WCHAR[512];
     HGLOBAL hMem = 0;
     size_t len = 0;
@@ -371,15 +378,9 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
     switch (message)
     {
     case WM_INITDIALOG:
-        dialogitem = GetDlgItem(hDlg, IDC_EDIT1);
-        ListView_GetItemText(listviewwnd, selecteditem.iItem, 0, temp, 512);
-        SetWindowText(hDlg, temp);
-        SetWindowText(dialogitem, temp);
-
-        dialogitem = GetDlgItem(hDlg, IDC_EDIT2);
-        ListView_GetItemText(listviewwnd, selecteditem.iItem, 2, temp, 512);
-        SetWindowText(dialogitem, temp);
-
+        SetWindowText(hDlg, L"Edit Value");
+        SetDlgText(hDlg, IDC_EDIT1, 0);
+        SetDlgText(hDlg, IDC_EDIT2, 2);
         return (INT_PTR)TRUE;
 
     case WM_COMMAND:
@@ -401,6 +402,11 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
                 return (INT_PTR)TRUE;
                 break;
         }
+        break;
+    case WM_CLOSE:
+        delete[] temp;
+        EndDialog(hDlg, LOWORD(wParam));
+        return (INT_PTR)TRUE;
         break;
     }
     return (INT_PTR)FALSE;
